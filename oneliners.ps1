@@ -387,11 +387,61 @@ dir d:\temp -rec -force | ? {!$_.PSIsContainer}|del
 (dir -file d:\test\* -r).name.Substring(0,4) # рекурсивно
 
 dir -file d:\test\*|foreach{
-    $date = $_.name.Substring(0,4);
+    #$date = $_.name.Substring(0,4);  # substring может вызвать ошибку доступа к индексу
     # или так
-    #$date = -join $_.name[0..3]
+    $date = -join $_.name[0..3]      # срезы - беопасный вариант доступа к диапазону индексов
     echo $date
 }
+
+
+dir -file|foreach{ "{0,-50} {1:#,#0.0000} Mb" -f  (-join $_.name[0..49]), $($_.length/1MB)}
+
+dir -file|foreach{ "{0,-50} {1:#,#0.0000} Kb" -f  (-join $_.name[0..49]), $($_.length/1kb)}
+
+dir | ? {!$_.PSIsContainer}| foreach{ "{0,-50} {1:#,#0.0000} Kb" -f  (-join $_.name[0..49]), $($_.length/1kb)}
+
+dir | Select Name, @{N="Size";E={"{0:#,#0.0000} Kb" -f $($_.Length / 1kb)}}
+
+dir -file | Select Name, @{N="Size";E={
+    $size = $_.Length
+    if     ($size -gt 1TB) {"{0:0.00} Tb" -f $($size / 1Tb)}
+    elseif ($size -gt 1GB) {"{0:0.00} Gb" -f $($size / 1Gb)}
+    elseif ($size -gt 1MB) {"{0:0.00} Mb" -f $($size / 1Mb)}
+    elseif ($size -gt 1KB) {"{0:0.00} Kb" -f $($size / 1Kb)}
+    elseIf ($size -ge 0)   {"{0:0.00} B"  -f $size}
+    }
+}
+
+dir | where {!$_.PSIsContainer} | foreach{ "{0,-50} {1:#,#0.0000} Mb" -f  $_.name, $($_.length/1MB)}
+dir | where {!$_.PSIsContainer} | Select Name, @{N="Size";E={"{0:#,#0.000} Kb" -f $($_.Length / 1kb)}}
+
+
+dir | ? {!$_.PSIsContainer} | Select Name, @{N="Size";E={
+    $size = $_.Length
+    if     ($size -gt 1TB) {"{0:0.00} Tb" -f $($size / 1Tb)}
+    elseif ($size -gt 1GB) {"{0:0.00} Gb" -f $($size / 1Gb)}
+    elseif ($size -gt 1MB) {"{0:0.00} Mb" -f $($size / 1Mb)}
+    elseif ($size -gt 1KB) {"{0:0.00} Kb" -f $($size / 1Kb)}
+    elseIf ($size -ge 0)   {"{0:0.00} B"  -f $size}
+    }
+}
+
+
+#https://superuser.com/questions/468782/show-human-readable-file-sizes-in-the-default-powershell-ls-command
+
+Function Format-FileSize() {
+    Param ([int]$size)
+    If     ($size -gt 1TB) {[string]::Format("{0:0.00} TB", $size / 1TB)}
+    ElseIf ($size -gt 1GB) {[string]::Format("{0:0.00} GB", $size / 1GB)}
+    ElseIf ($size -gt 1MB) {[string]::Format("{0:0.00} MB", $size / 1MB)}
+    ElseIf ($size -gt 1KB) {[string]::Format("{0:0.00} kB", $size / 1KB)}
+    ElseIf ($size -gt 0)   {[string]::Format("{0:0.00} B", $size)}
+    Else                   {""}
+}
+
+dir| Select Name, @{N="Size";E={Format-FileSize($_.Length)}}
+
+
 
 
 # для Powershell 2.0
@@ -514,12 +564,12 @@ Get-Module -ListAvailable| % {
 [regex]::replace('hello world','\b.', {$args[0].Value.ToUpper()})
 
 # более экзотический вариант ([char]32  - это пробел)
-'hello world' -split [char]32| % {"$($_[0])".ToUpper()+(-join $_[1..$($_.Length-1)])}
+'hello world' -split [char]32| % {"$($_[0])".ToUpper() + (-join $_[1..$($_.Length-1)])}
 # тоже самое, но с использованием статического метода Char.ToUpper()
-'hello world' -split [char]32| % {[char]::ToUpper($_[0])+(-join $_[1..$($_.Length-1)])}
+'hello world' -split [char]32| % {[char]::ToUpper($_[0]) + (-join $_[1..$($_.Length-1)])}
 # а здесь заменим манипуляции с получением диапазона символов(и их последующего склеивания) -
 # обычным методом Substring()
-'hello world' -split [char]32| % {[char]::ToUpper($_[0])+$_.Substring(1,$_.Length-1)}
+'hello world' -split [char]32| % {[char]::ToUpper($_[0]) + $_.Substring(1,$_.Length-1)}
 
 # создать линию из 20 звездочек
 [Linq.Enumerable]::Repeat("*",20) -join ""
@@ -588,6 +638,40 @@ dir $source -inc $maskfile -rec| % {
 
 # переименование файлов из списка путей по списку имен
 cat source.txt|%{$n=0;$f=cat names.txt}{ren $_ $f[$n];$n++;}
+
+# прочитать текст с конца
+$text = [IO.File]::ReadAllText("$($pwd.path)\text.txt",[Text.Encoding]::Default)
+([regex]::Matches($text,'.','RightToLeft,Singleline')| ForEach {$_.value}) -join ''
+# символы без учета \n
+([regex]::Matches($text,'.','RightToLeft')| ForEach {$_.value}) -join ''
+<#
+.зов утсоровх яащузев ,акдашоЛ
+урог в оннелдем ястеаминдоп ,ужялГ
+.зором йыньлис лыб ;лешыв усел зи Я
+,уроп ююнмиз юунедутс в ,ыджандО
+#>
+
+
+([regex]::Matches($text,'.','RightToLeft,Singleline') | ForEach {$_.value}
+) -join '' -replace "`n`r","`r`n" |sc text_new.txt -enc Default
+
+$a = (cat -raw -enc Default text.txt) -split "";
+[array]::Reverse($a);
+$a -join '' -replace "`n`r","`r`n" | sc text_new.txt -enc Default
+
+
+gc text.txt -enc Default|%{-join ($x = $_).tochararray()[$x.length..0]}
+<#
+,уроп ююнмиз юунедутс в ,ыджандО
+.зором йыньлис лыб ;лешыв усел зи Я
+урог в оннелдем ястеаминдоп ,ужялГ
+.зов утсоровх яащузев ,акдашоЛ
+#>
+
+gc text.txt -raw -enc Default|%{-join ($x = $_).tochararray()[$x.length..0] -replace "`n`r","`r`n"} | out-file text_new.txt -enc Default
+
+gc text_UTF8.txt -raw -enc UTF8|%{-join ($x = $_).tochararray()[$x.length..0] -replace "`n`r","`r`n"} | out-file text_new_UTF8_1.txt -enc UTF8
+
 #=======================================================
 # ДАТА И ВРЕМЯ
 #=======================================================
@@ -648,6 +732,7 @@ get-date -f 'd'           # только дата: 15.12.2015
 "{0:00}:{1:00}:{2:00}.{3:00}" -f $ts.Hours, $ts.Minutes, $ts.Seconds, ($ts.Milliseconds/10)
 
 [datetime]::ParseExact('11222015-13~44~14','MMddyyyy-ss~mm~HH',$null)
+
 [datetime]::parse("22/2/2015 23:12:33.1233")
 [datetime]"2/22/2015"
 [datetime]"23:12:33"
@@ -664,6 +749,15 @@ get-date -f 'd'           # только дата: 15.12.2015
 ([datetime]::parse('2015-03-08')).ToString("dd-MMM-yyyy",[Globalization.CultureInfo]::CurrentUICulture) # последний параметр для текущей локали можно опустить
 # русское название дня недели все равно не выводит
 ([datetime]::parse("$(get-date)",[Globalization.CultureInfo]::CreateSpecificCulture("ru-RU"))).DayOfWeek
+
+# определяем день недели
+powershell get-date -f 'dddd'                                   # текущий день недели
+powershell ([datetime]::parse('31/12/2018')).ToString('dddd')   # формат ввода дд.мм.гггг , локализованное имя дня недели
+powershell ([datetime]'12/31/2018').ToString('dddd')            # формат ввода мм.дд.гггг (либо гггг.мм.дд), локализованное имя дня недели
+powershell ([datetime]::parse('31/12/2018')).DayOfWeek          # анг. название дня недели
+powershell ([datetime]'12/31/2018').DayOfWeek                   # анг. название дня недели
+powershell ([datetime]::parse('31/12/2018',[Globalization.CultureInfo]::CreateSpecificCulture('ru-RU'))).DayOfWeek #  имя дня недели в указанной культуре
+([datetime]::ParseExact('12/31/2018','MM/dd/yyyy',$null)).ToString('dddd')
 
 # узнаем названия дня недели; DayOfWeek выдает только анг. названия
 (get-date).DayOfWeek
@@ -684,6 +778,9 @@ $ci=new-object Globalization.CultureInfo("fr-FR", $false)
 [Globalization.CultureInfo]::CurrentCulture
 ([datetime]"2015/12/15").ToString("dddd")
 (get-date).ToString("dddd")
+
+# получить вчерашний день
+(Get-date -hour 0 -minute 0 -second 0).AddDays(-1).Date.Day
 
 # получить файлы старше 31-го дня (созданные более чем 31 день назад)
 dir  | ? { $_.CreationTime -lt (get-date).AddDays(-31)}
@@ -861,7 +958,11 @@ MonthGenitiveNames               : {января, февраля, марта, а
 [Enum]::GetValues([ConsoleColor])| % {write-host ("[{0}]{1}" -f ([int]$_),$_) -for $_}
 
 # раскрасим все слова в предложении 
-$c=0;"однажды, в студеную зимнюю пору, я из лесу вышел; был сильный мороз" -split [char]32| % {write-host ($_+" ") -f ([ConsoleColor]$c++) -NoNewline}
+$c=0;
+(@"
+однажды, в студеную зимнюю пору, 
+я из лесу вышел; был сильный мороз
+"@) -split [char]32| Foreach {write-host ($_+" ") -f ([ConsoleColor]$c++) -NoNewline}
 
 $c=0;cat 1.txt| % {
     ($_ -split [char]32| % {
@@ -1130,3 +1231,60 @@ ParallelDownload ('http://www.cyberforum.ru/robots.txt',
 Invoke-AsWorkflow -Expression "ipconfig /all" -PSComputerName (cat DomainControllers.txt) -AsJob -JobName IPConfig
 
 #=======================================================
+
+
+"$((get-date)-(ps cmd).StartTime)"
+([DateTime]"$($$ = (get-date) - (ps winlogon)[0].StartTime)$$").ToLongTimeString()
+
+([DateTime]"$($$ = (get-date) - (ps winlogon)[0].StartTime)$$").ToLongTimeString()
+
+([DateTime]"$($$ = (get-date) - (ps explorer)[0].StartTime)$$").ToLongTimeString()
+
+
+
+# swap переменных
+$x=5
+$y=1
+$x = $x + $y;
+$y = $x - $y;
+$x = $x- $y;
+
+
+
+foreach ($x in (1,2,3,4,5)) {
+"$x"
+}
+
+powershell -Exec Bypass "&{if ((gi "1.txt").length) {echo 'пустой'} else {echo 'не пустой'}}"
+
+[datetime]::ParseExact("01/12/2000 01:01:01","dd'/'MM'/'yyyy HH:mm:ss",$null)
+
+
+$c=0;cat 1.txt|%{
+    ($_ -split [char]32| % {
+        write-host ($_+" ") -f ([ConsoleColor]$c++) -n;if ($c -gt 15){$c=0}});
+            write-host ""}
+
+
+
+#powershell "iex ((new-object net.webclient). DownloadString('https://chocolatey.org/install.ps1'))" && SET PATH=%PATH%;%ALLUSERSPROFILE%\chocolatey\bin
+
+$files=dir | ? {$_.Mode -notmatch "d"}|sort length 
+$files[0],$files[-1]|select @{n="name";e={$_.name}}, 
+@{n="CreationTime";e={$_.CreationTime}},
+@{n="Size";e={$_.length}}|ft -auto
+
+($$ = ls -r| ? {!$_.PSIsContainer} | sort Length | select Name, Length, CreationTime) |
+? {$_.Length -eq $$[0].Length -or $_.Length -eq $$[($$.Length - 1)].Length}
+
+
+
+($$ = ls -r| ? {!$_.PSIsContainer} | sort Length | select FullName, Length, CreationTime) |
+? {$_.Length -eq $$[0].Length -or $_.Length -eq $$[-1].Length}
+
+
+$$ = ls -r| ? {!$_.PSIsContainer} | sort Length | select FullName, Length, CreationTime
+$$[0]
+$$[-1]
+
+ls -r| ? {!$_.PSIsContainer} | sort Length | select FullName, Length, CreationTime -First 1 -Last 1
