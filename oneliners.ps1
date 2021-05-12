@@ -80,6 +80,12 @@ ps -IncludeUserName | ? {$_.UserName -match "система|system"}| select -Ex
 # получить список имен процессов имеющих более, чем один экземпляр
 ps| group ProcessName | ? {$_.count -gt 1}
 
+# получить  объект  FileVersionInfo процесса и все его свойства, отфильтровав по производителю (только программы microsoft)
+ps | ? Path |  gi | % versioninfo | ? CompanyName -eq "Microsoft Corporation"| fl 
+
+# получить  объект  FileVersionInfo у всех пользовательских процессов и все его свойства, отфильтровав по производителю (кроме программ microsoft)
+ps | ? UserName -notmatch "система|system" | ? Path |  gi | % versioninfo | ? CompanyName -ne "Microsoft Corporation"| fl
+
 #=======================================================
 # РЕЕСТР
 #=======================================================
@@ -830,6 +836,16 @@ $Year=(get-date).Year;$Month=(get-date).Month
   }| % {"[{0:d2}]={1}" -f $_,$DayOfWeek}
 
 "================================================="
+((Get-Date –Date '01/01/1970') + (
+    gp 'HKLM:\Software\Microsoft\Windows NT\CurrentVersion' | 
+    Select -Expand 'InstallDate' | 
+    %{ New-Timespan -Seconds $_})
+).ToString('yyyyMMdd')
+
+((Get-Date –Date '01/01/1970') +  (New-Timespan -Seconds  1601924879)).ToString('yyyyMMdd')
+([DateTime]'1.1.1970' + (new-timespan -sec 1601924879)).ToString('yyyyMMdd')
+"================================================="
+
 
 # вывести номер дня и название дня недели каждого дня указанного месяца в указанном году
 1..([datetime]::DaysInMonth(2015,12))| % {"{0}:{1}" -f $_,([datetime]"2015.12.$_").DayOfWeek}
@@ -1079,10 +1095,18 @@ for ($i=0;$i -le 1000000;$i++){}
 # используем класс StopWatch
 $sw=[Diagnostics.StopWatch]::StartNew()
 for ($i=0;$i -le 1000000;$i++){}
+$sw.Stop()
 "$($sw.Elapsed)"
 
 $sw=[Diagnostics.StopWatch]::StartNew()
 (1..10000).ForEach({$_})
+"$sw.Stop()
+$($sw.Elapsed)"
+
+$sw = New-Object -TypeName "Diagnostics.StopWatch"
+$sw.Start()
+(1..10000).ForEach({$_})
+$sw.Stop()
 "$($sw.Elapsed)"
 
 #=======================================================
@@ -1229,3 +1253,13 @@ ParallelDownload ('http://www.cyberforum.ru/robots.txt',
 
 # параллельное выполнение команды на всех компьютерах сразу
 Invoke-AsWorkflow -Expression "ipconfig /all" -PSComputerName (cat DomainControllers.txt) -AsJob -JobName IPConfig
+
+
+
+$bytes = [bitconverter]::GetBytes([int64] "0xf05d42655f12")
+[array]::Reverse( $bytes)
+[bitconverter]::ToInt64($bytes,0)
+
+#$bytes = ([int64] "0xf05d42655f12"  | Format-Hex).Bytes
+#[array]::Reverse( $bytes)
+#[bitconverter]::ToInt64($bytes,0)
