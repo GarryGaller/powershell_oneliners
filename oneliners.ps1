@@ -84,7 +84,27 @@ ps| group ProcessName | ? {$_.count -gt 1}
 ps | ? Path |  gi | % versioninfo | ? CompanyName -eq "Microsoft Corporation"| fl 
 
 # получить  объект  FileVersionInfo у всех пользовательских процессов и все его свойства, отфильтровав по производителю (кроме программ microsoft)
-ps | ? UserName -notmatch "система|system" | ? Path |  gi | % versioninfo | ? CompanyName -ne "Microsoft Corporation"| fl
+ps | ? UserName -notmatch "система|system" | ? Path |  gi | % versioninfo | ? CompanyName -notmatch "microsoft"| fl
+
+$props = "FileDescription","FileVersionRaw","ProductName","ProductVersionRaw","Language","InternalFilename", "OriginalFilename", "Filename","LegalCopyright"
+# варианты с разными видами форматирования вывода при записи в файл
+ps | ? UserName -notmatch "система|system" | ? Path |  gi | % versioninfo | ft -auto -property $props| Out-File c:\info.txt  -enc utf8
+ps | ? UserName -notmatch "система|system" | ? Path |  gi | % versioninfo | fl -property $props| Out-File c:\info.txt -enc utf8
+ps | ? UserName -notmatch "система|system" | ? Path |  gi | % versioninfo | select $props | export-csv c:\info.txt -enc utf8 -NoTypeInformation
+
+# вывод в файл в табличном виде с кастомными именами заголовков
+ps | ? UserName -notmatch "система|system" | ? Path |  gi | ft (
+    @{n="Описание файла";      e={$_.versioninfo.FileDescription}},
+    @{n="Версия файла";        e={$_.versioninfo.FileVersionRaw}},
+    @{n="Название программы";  e={$_.versioninfo.ProductName}},
+    @{n="Версия программы";    e={$_.versioninfo.ProductVersionRaw}},
+    @{n="Язык";                e={$_.versioninfo.Language}},
+    @{n="Внутреннее имя";      e={$_.versioninfo.InternalFilename}},
+    @{n="Оригинальное имя";    e={$_.versioninfo.OriginalFilename}},
+    @{n="Имя файла программы"; e={$_.versioninfo.Filename}},
+    @{n="Авторские права";     e={$_.versioninfo.LegalCopyright}},
+    @{n="Размер(Kb)";          e={($_.Length/1KB).ToString("F2")};a="right"}
+)  | Out-File c:\info.txt -enc utf8 -width 10000
 
 #=======================================================
 # РЕЕСТР
