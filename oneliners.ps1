@@ -106,6 +106,48 @@ ps | ? UserName -notmatch "система|system" | ? Path |  gi | ft (
     @{n="Размер(Kb)";          e={($_.Length/1KB).ToString("F2")};a="right"}
 )  | Out-File c:\info.txt -enc utf8 -width 10000
 
+# получить таблицу использования памяти для конкретного процесса
+
+$processName = "explorer"
+$perf = gwmi Win32_PerfFormattedData_PerfProc_Process | ? {$_.Name -eq $processName}
+$perf |ft (
+    @{n= "Name|";                e= {"{0}|"    -f $processName};                  a="right"}, 
+    @{n= "Private Bytes|";       e= {"{0} Kb|" -f ($_.PrivateBytes / 1024)};      a="right"},
+    @{n= "Private Working Set|"; e= {"{0} Kb|" -f ($_.WorkingSetPrivate / 1024)}; a="right"},
+    @{n= "Working Set|";         e= {"{0} Kb|" -f ($_.WorkingSet / 1024)};        a="right"}
+)
+
+$process = get-process -Name $processName
+$perf = gwmi Win32_PerfFormattedData_PerfProc_Process | ? {$_.IDprocess -eq $process.ID}
+$perf |ft (
+    @{n= "Name|";                e= {"{0}|"    -f $processName};                  a="right"}, 
+    @{n= "Private Bytes|";       e= {"{0} Kb|" -f ($_.PrivateBytes / 1024)};      a="right"},
+    @{n= "Private Working Set|"; e= {"{0} Kb|" -f ($_.WorkingSetPrivate / 1024)}; a="right"},
+    @{n= "Working Set|";         e= {"{0} Kb|" -f ($_.WorkingSet / 1024)};        a="right"}
+)
+
+$samples = (Get-Counter "\Процесс($processName)\рабочий набор (частный)").CounterSamples 
+$samples | ft (
+    @{n= "Name|";                e= {"{0}|"    -f $processName};            a="right"}, 
+    @{n= "Private Working Set|"; e= {"{0} Kb|" -f ($_.CookedValue / 1024)}; a="right"}
+)
+
+$samples = (Get-Counter "\Процесс($processName)\рабочий набор").CounterSamples 
+$samples | ft (
+    @{n= "Name|";        e= {"{0}|"    -f $processName};            a="right"}, 
+    @{n= "Working Set|"; e= {"{0} Kb|" -f ($_.CookedValue / 1024)}; a="right"}
+)
+
+$processName = "explorer"
+$samples = (Get-Counter "\Процесс($processName)\байт исключительного пользования").CounterSamples 
+$samples | ft (
+    @{n= "Name|";          e= {"{0}|"    -f $processName};            a="right"}, 
+    @{n= "Private Bytes|"; e= {"{0} Kb|" -f ($_.CookedValue / 1024)}; a="right"}
+)
+
+
+
+
 #=======================================================
 # РЕЕСТР
 #=======================================================
